@@ -118,11 +118,7 @@ class MetricManager(base.Manager):
             headers={'Content-Type': "application/json"},
             data=ujson.dumps({name: metric})).json()[0]
 
-    # FIXME(jd): remove refetch_metric when LP#1497171 is fixed
-    @removals.removed_kwarg("refetch_metric")
-    @removals.removed_kwarg("metric")
-    def create(self, metric=None, refetch_metric=True,
-               name=None,
+    def create(self, name=None,
                archive_policy_name=None,
                resource_id=None,
                unit=None):
@@ -137,41 +133,29 @@ class MetricManager(base.Manager):
         :param unit: The unit of the metric.
         :type unit: str
         """
-        if metric is None:
-            metric = {}
-            if name is not None:
-                metric["name"] = name
-            if archive_policy_name is not None:
-                metric["archive_policy_name"] = archive_policy_name
-            if resource_id is not None:
-                metric["resource_id"] = resource_id
-            if unit is not None:
-                metric["unit"] = unit
-
-        resource_id = metric.get('resource_id')
+        metric = {}
+        if name is not None:
+            metric["name"] = name
+        if archive_policy_name is not None:
+            metric["archive_policy_name"] = archive_policy_name
+        if unit is not None:
+            metric["unit"] = unit
 
         if resource_id is None:
             metric = self._post(
                 self.metric_url, headers={'Content-Type': "application/json"},
                 data=ujson.dumps(metric)).json()
-            # FIXME(sileht): create and get have a
-            # different output: LP#1497171
-            if refetch_metric:
-                return self.get(metric["id"])
             return metric
 
-        metric_name = metric.get('name')
+        if name is None:
+            raise TypeError("metric name is required if resource_id is set")
 
-        if metric_name is None:
-            raise TypeError("metric_name is required if resource_id is set")
-
-        del metric['resource_id']
-        metric = {metric_name: metric}
+        metric = {name: metric}
         metric = self._post(
             self.resource_url % resource_id,
             headers={'Content-Type': "application/json"},
             data=ujson.dumps(metric))
-        return self.get(metric_name, resource_id)
+        return self.get(name, resource_id)
 
     def delete(self, metric, resource_id=None):
         """Delete an metric.
